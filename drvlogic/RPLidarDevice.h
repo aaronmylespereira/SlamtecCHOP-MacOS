@@ -1,6 +1,9 @@
-﻿
 #pragma once
 #include "common.h"
+#include <vector>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 class RPLidarDevice {
 
@@ -47,7 +50,7 @@ class RPLidarDevice {
         int data_count_;
 
         std::string _address_1;     // serial port / ip
-        int _address_2;          // baudrate / network port
+        int _address_2;          // baudrate / network port;
         bool _standart;
         bool _udp;
         bool _channelTypeSerial = true;
@@ -59,6 +62,7 @@ class RPLidarDevice {
         std::string status_msg_;
         
         bool  is_connected_;
+        bool  is_data_ready_;
         bool  is_busy_;             // for multithreading
 
         IChannel* channel_;
@@ -76,4 +80,17 @@ class RPLidarDevice {
         bool qualityCheck_;
 
         std::thread _lidarThread;
+
+    private:
+        std::thread _acquisitionThread;
+        std::mutex _dataMutex;
+        std::condition_variable _dataCondition;
+        bool _stopAcquisitionThread = false;
+        sl_lidar_response_measurement_node_hq_t _sharedNodes[8192]; // Shared buffer
+        size_t _sharedCount = 0;
+        bool _newDataAvailable = false;
+
+        void acquisition_thread_func();
+
+        int _acquisitionDelayMs = 0; // New member for configurable delay
 };

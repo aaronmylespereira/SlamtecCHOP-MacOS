@@ -1,7 +1,8 @@
 #pragma once
 
-class OP_Inputs;
-class OP_ParameterManager;
+#include "CHOP_CPlusPlusBase.h"
+
+using namespace TD;
 
 #pragma region ParNames and ParLabels
 

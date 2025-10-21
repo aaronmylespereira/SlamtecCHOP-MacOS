@@ -1,4 +1,4 @@
-﻿#include "RPLidarDevice.h"
+#include "RPLidarDevice.h"
 #include <thread>
 
 static const int baudRateLists[] = {
@@ -14,11 +14,11 @@ RPLidarDevice::RPLidarDevice()
 
     is_connected_ = false;
     is_busy_ = false;
+    is_data_ready_ = false;
     
     serial_number = "";
     hardware_version = "";
     firmware_version = "";
-    is_connected_ = false;
     
     lidar_drv_ = nullptr;
     channel_ = nullptr;
@@ -32,8 +32,6 @@ RPLidarDevice::~RPLidarDevice()
 {
     status_msg_ = "RPLidar destructor called";
     on_disconnect();
-    delete lidar_drv_;
-    lidar_drv_ = nullptr;
 }
 
 void
@@ -60,6 +58,7 @@ RPLidarDevice::setLidar(bool serial, const char* address_1, int address_2, float
 bool
 RPLidarDevice::thr_connect(bool& serial, std::string& address_1, int& address_2, bool& standart, bool &udp)
 {
+    sl_result ans;
 
     if(serial)
         channel_ = (*createSerialPortChannel(address_1, baudRateLists[address_2]));
@@ -80,7 +79,7 @@ RPLidarDevice::thr_connect(bool& serial, std::string& address_1, int& address_2,
         return SL_RESULT_OPERATION_FAIL == 1;
     }
     
-    sl_result ans =(lidar_drv_)->connect(channel_);
+    ans =(lidar_drv_)->connect(channel_);
 
     if (SL_IS_FAIL(ans)) {
         status_msg_ = "Error, cannot bind to the specified address: " + _address_1;
@@ -107,7 +106,7 @@ RPLidarDevice::thr_connect(bool& serial, std::string& address_1, int& address_2,
     get_scan_modes();
 
     if(serial)
-        lidar_drv_->setMotorSpeed();
+        lidar_drv_->setMotorSpeed(0);
     
     if(standart)
         lidar_drv_->startScanExpress(0,0,0,&currentScanMode);
@@ -117,12 +116,59 @@ RPLidarDevice::thr_connect(bool& serial, std::string& address_1, int& address_2,
     is_connected_ = true;
     status_msg_ = "Connected to RPLidar on " + _address_1;
     is_busy_ = false;
+
+    // wait for data to be ready
+    sl_lidar_response_measurement_node_hq_t nodes[8192];
+    size_t   count = _countof(nodes);
+    while(!is_data_ready_)
+    {
+        op_result_ = lidar_drv_->grabScanDataHq(nodes, count, 1000);
+        if (SL_IS_OK(op_result_) && count > 0)
+        {
+            is_data_ready_ = true;
+        }
+    }
+
     return false;
+}
+
+void RPLidarDevice::acquisition_thread_func()
+{
+    sl_lidar_response_measurement_node_hq_t nodes[8192];
+    size_t count = _countof(nodes);
+
+    while (!_stopAcquisitionThread)
+    {
+        // Acquire data from lidar
+        sl_result result = lidar_drv_->grabScanDataHq(nodes, count, 1000);
+
+        if (SL_IS_OK(result) && count > 0)
+        {
+            std::unique_lock<std::mutex> lock(_dataMutex);
+            // Copy data to shared buffer
+            std::memcpy(_sharedNodes, nodes, count * sizeof(sl_lidar_response_measurement_node_hq_t));
+            _sharedCount = count;
+            _newDataAvailable = true;
+            _dataCondition.notify_one(); // Notify main thread that new data is available
+
+            // Introduce a delay after successful data acquisition
+            if (_acquisitionDelayMs > 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(_acquisitionDelayMs));
+            }
+        }
+        else
+        {
+            // Handle error or no data case, maybe sleep for a bit to avoid busy-waiting
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        count = _countof(nodes); // Reset count for next grabScanDataHq call
+    }
 }
 
 bool
 RPLidarDevice::on_connect()
 {
+    printf("RPLidarDevice::on_connect()\n");
     if (is_connected_ || is_busy_) return true;
     if(_channelTypeSerial)
     {
@@ -135,30 +181,45 @@ RPLidarDevice::on_connect()
 
     is_busy_ = true;
     _lidarThread = std::thread([this] {this->thr_connect(_channelTypeSerial, _address_1, _address_2, _standart, _udp);});
-    _lidarThread.detach();
+    _lidarThread.join(); // Wait for thr_connect to finish initialization
+
+    if (is_connected_) { // Only start acquisition thread if connection was successful
+        _stopAcquisitionThread = false;
+        _acquisitionThread = std::thread(&RPLidarDevice::acquisition_thread_func, this);
+    }
     
-    return true;
+    return is_connected_; // Return actual connection status
 }
 
 void
 RPLidarDevice::on_disconnect()
 {
-    status_msg_ = "Disconnecting from RPLidar";
-    
-    if (is_connected_) {
+    // Signal acquisition thread to stop and join it
+    _stopAcquisitionThread = true;
+    if (_acquisitionThread.joinable()) {
+        _acquisitionThread.join();
+    }
+
+    if (is_connected_ && lidar_drv_) {
         lidar_drv_->stop();
         if(_channelTypeSerial) lidar_drv_->setMotorSpeed(0);
     }
     is_connected_ = false;
-    delete lidar_drv_;
-    lidar_drv_ = nullptr;
-    delete channel_;
-    channel_ = nullptr;
+    is_data_ready_ = false;
+    if (lidar_drv_)
+    {
+        delete lidar_drv_;
+        lidar_drv_ = nullptr;
+    }
+    if (channel_)
+    {
+        delete channel_;
+        channel_ = nullptr;
+    }
     init_data();
 }
 
-void
-RPLidarDevice::update_status()
+void RPLidarDevice::update_status()
 {
      printf("SLAMTEC LIDAR S/N: ");
      serial_number = "";
@@ -248,52 +309,51 @@ void RPLidarDevice::get_scan_modes()
 void RPLidarDevice::scan(float min_dist, float max_dist)
 {
     if(is_busy_ || !is_connected_) return;
-    
-    sl_lidar_response_measurement_node_hq_t nodes[8192];
-    size_t   count = _countof(nodes);
-    
-    op_result_ = lidar_drv_->getScanDataWithIntervalHq(nodes, count);
-    data_count_ = count;
 
-    if (SL_IS_OK(op_result_)) {
-        for (int pos = 0; pos < static_cast<int>(count) ; ++pos) {
+    std::unique_lock<std::mutex> lock(_dataMutex, std::try_to_lock);
+    if (!lock.owns_lock() || !_newDataAvailable) {
+        // If we can't get the lock or no new data is available, return immediately
+        // or use the previously acquired data.
+        return;
+    }
 
-            bool write = true;
-            if(qualityCheck_)
-            {
-                if(nodes[pos].flag < 2 || nodes[pos].quality < 150)
-                {
-                    write = false;
-                }
-            }
+    // Process data from shared buffer
+    size_t currentCount = _sharedCount;
+    for (int pos = 0; pos < static_cast<int>(currentCount) ; ++pos) {
 
-            const double tempAngle = nodes[pos].angle_z_q14 * 90.f / 16384.f;
-            if (tempAngle > 360 || tempAngle < 0)
+        bool write = true;
+        if(qualityCheck_)
+        {
+            if(_sharedNodes[pos].flag < 2 || _sharedNodes[pos].quality < 150)
             {
                 write = false;
             }
-
-            const int halfAngle = floor(tempAngle * precision_);
-            const float distance = nodes[pos].dist_mm_q2 / 4.0f;
-            if (distance > max_dist || distance < min_dist)
-            {
-                data_[halfAngle].distance = 0;
-                write = false;
-            }
-
-            if(write)
-            {
-                data_[halfAngle].distance = distance;
-                data_[halfAngle].angle = halfAngle;
-                data_[halfAngle].quality = nodes[pos].quality;
-                data_[halfAngle].flag = nodes[pos].flag;
-            }
-            
         }
 
-        // generate random number form 1 to 100
-        _rnd_number = rand() % 100 + 1;
+        const double tempAngle = _sharedNodes[pos].angle_z_q14 * 90.f / 16384.f;
+        if (tempAngle > 360 || tempAngle < 0)
+        {
+            write = false;
+        }
+
+        const int halfAngle = static_cast<int>(tempAngle * precision_);
+        const float distance = _sharedNodes[pos].dist_mm_q2 / 4.0f;
+        if (distance > max_dist || distance < min_dist)
+        {
+            data_[halfAngle].distance = 0;
+            write = false;
+        }
+
+        if(write)
+        {
+            data_[halfAngle].distance = distance;
+            data_[halfAngle].angle = halfAngle;
+            data_[halfAngle].quality = _sharedNodes[pos].quality;
+            data_[halfAngle].flag = _sharedNodes[pos].flag;
+        }
+        
     }
+    _newDataAvailable = false; // Reset flag after processing
 }
 
 void RPLidarDevice::init_data()
@@ -315,6 +375,7 @@ void RPLidarDevice::init_data()
     _udp = false;
     _channelTypeSerial = true;
     _rnd_number = 0;
+    is_data_ready_ = false;
 }
 
 

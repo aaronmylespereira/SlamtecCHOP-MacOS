@@ -20,6 +20,8 @@
 
 #include "drvlogic/RPLidarDevice.h"
 
+using namespace TD;
+
 // #include "rplidar_sdk/sdk/include/sl_lidar.h"
 // #include "rplidar_sdk/sdk/include/sl_lidar_driver.h"
 

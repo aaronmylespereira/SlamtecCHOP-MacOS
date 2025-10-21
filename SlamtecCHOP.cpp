@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <string>
 
+using namespace TD;
+
 // These functions are basic C function, which the DLL loader can find
 // much easier than finding a C++ Class.
 // The DLLEXPORT prefix is needed so the compile exports these functions from the .dll
@@ -332,11 +334,11 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("executeCount");
 		// Set the value for the second column
-		#ifdef WIN32
-			sprintf_s(tempBuffer, "%d", my_execute_count_);
-		#else // macOS
-			snprintf(tempBuffer, sizeof(tempBuffer), "%d", myExecuteCount);
-		#endif
+#ifdef WIN32
+		sprintf_s(tempBuffer, "%d", my_execute_count_);
+#else // macOS
+		snprintf(tempBuffer, sizeof(tempBuffer), "%d", my_execute_count_);
+#endif
 		entries->values[1]->setString(tempBuffer);
 	}
 	
@@ -345,11 +347,7 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("Lidar status");
 		// Set the value for the second column
-		#ifdef WIN32
-			const std::string status = lidar->get_device_status();
-		#else // macOS
-			snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-		#endif
+		const std::string status = lidar->get_device_status();
 		entries->values[1]->setString(status.c_str());
 	}
 
@@ -358,11 +356,7 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("Serial number");
 		// Set the value for the second column
-		#ifdef WIN32
 		const std::string status = lidar->serial_number;
-#else // macOS
-		snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-#endif
 		entries->values[1]->setString(status.c_str());
 	}
 
@@ -371,11 +365,7 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("Firmware version");
 		// Set the value for the second column
-		#ifdef WIN32
 		const std::string status = lidar->firmware_version;
-#else // macOS
-		snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-#endif
 		entries->values[1]->setString(status.c_str());
 	}
 
@@ -384,11 +374,7 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("Hardware version");
 		// Set the value for the second column
-		#ifdef WIN32
 		const std::string status = lidar->hardware_version;
-#else // macOS
-		snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-#endif
 		entries->values[1]->setString(status.c_str());
 	}
 
@@ -397,11 +383,7 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("Model");
 		// Set the value for the second column
-		#ifdef WIN32
 		const std::string status = lidar->model;
-#else // macOS
-		snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-#endif
 		entries->values[1]->setString(status.c_str());
 	}
 
@@ -410,11 +392,7 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("Motor max/min/desired speed");
 		// Set the value for the second column
-		#ifdef WIN32
 		const std::string status = lidar->max_speed + "/" + lidar->min_speed + "/" + lidar->desired_speed;
-#else // macOS
-		snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-#endif
 		entries->values[1]->setString(status.c_str());
 	}
 
@@ -423,11 +401,7 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("Last reading");
 		// Set the value for the second column
-		#ifdef WIN32
 		const std::string status = std::to_string(lidar->data_count_);
-#else // macOS
-		snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-#endif
 		entries->values[1]->setString(status.c_str());
 	}
 
@@ -436,11 +410,7 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("Available scan modes");
 		// Set the value for the second column
-		#ifdef WIN32
 		const std::string status = lidar->scanModesStr;
-#else // macOS
-		snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-#endif
 		entries->values[1]->setString(status.c_str());
 	}
 
@@ -449,11 +419,7 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("Current scan mode");
 		// Set the value for the second column
-		#ifdef WIN32
 		const std::string status = lidar->currentScanMode.scan_mode;
-#else // macOS
-		snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-#endif
 		entries->values[1]->setString(status.c_str());
 	}
 
@@ -462,11 +428,7 @@ SlamtecCHOP::getInfoDATEntries(int32_t index,
 		// Set the value for the first column
 		entries->values[0]->setString("Motor control");
 		// Set the value for the second column
-		#ifdef WIN32
 		const std::string status = lidar->motor_control;
-#else // macOS
-		snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-#endif
 		entries->values[1]->setString(status.c_str());
 	}
 }
