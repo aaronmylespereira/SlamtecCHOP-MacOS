@@ -1,6 +1,6 @@
 # TouchDesigner Slamtec Lidar support for MacOS
 
-This is a fork of Ajasra (Vasily’s) Slamtec Lidar CPlusPlus CHOP for TouchDesigner. This plugin was built with Gemini-CLI by editing and rebuilding the original project files.
+This is a fork of Ajasra (Vasily’s) Slamtec Lidar CPlusPlus CHOP for TouchDesigner. This plugin was built with Gemini-CLI by editing and rebuilding the original project files. I have no idea how it was built, I just kept prompting it and the plugin crashing TouchDesigner till it finally worked.
 
 ### Supported:
 RPLIDAR A1 / A2 / A3 / S1 / S2 / S3 BUT tested with only an A1M8 on an M1 Pro and M3 Max with MacOS Sequoia 
@@ -24,6 +24,8 @@ Since this app was not built on your machine it might not load into TouchDesigne
 You can add the infoDAT to see lidar information.
 
 ### Compiling:
+Updated cpp files for MacOS are placed in the drvlogic folder and have all been edited and built by Gemini-CLI.
+
 1. cd to the main directory of the folder
 2. Clone the original [rplidar-sdk](https://github.com/Slamtec/rplidar_sdk)
 3. Make a new build directory by ```mkdir build``` and ```cd build```
