@@ -5,7 +5,14 @@ This is a fork of Ajasra (Vasily’s) Slamtec Lidar CPlusPlus CHOP for TouchDesi
 ### Supported:
 RPLIDAR A1 / A2 / A3 / S1 / S2 / S3 BUT tested with only an A1M8 on an M1 Pro and M3 Max with MacOS Sequoia 
 
-### Quarantine
+### Quarantine:
+Since this app was not built on your machine it might not load into TouchDesigner, this can be fixed by removing the quarantine attribute associated with the plugin, below are the steps.
+
+1. Locate the plugin in the downloaded folder
+2. Open up a terminal window
+3. Type in ```xattr -d com.apple.quarantine ```
+4. Drag and drop the plugin into the terminal window, and click enter
+5. Your plugin should now load in TouchDesigner
 
 ### Setup:
 1. Please make sure CP210x drivers are installed from [here](https://www.silabs.com/software-and-tools/usb-to-uart-bridge-vcp-drivers?tab=downloads)
