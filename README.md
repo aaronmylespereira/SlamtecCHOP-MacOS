@@ -23,12 +23,10 @@ Since this app was not built on your machine it might not load into TouchDesigne
 
 You can add the infoDAT to see lidar information.
 
-### Compiling
-1. Clone this repository
-2. Clone the [rplidar sdk](https://github.com/Slamtec/rplidar_sdk)
-3. Open in Visual Studio 2019
-4. Add the rplidar SDK to the project
-5. Follow [this steps](https://github.com/Slamtec/rplidar_sdk/issues/71#issuecomment-1382005055) to setup right linking
-6. Build
-
+### Compiling:
+1. cd to the main directory of the folder
+2. Clone the original [rplidar-sdk](https://github.com/Slamtec/rplidar_sdk)
+3. Make a new build directory by ```mkdir build``` and ```cd build```
+4. Run ```cmake ..```
+5. Compile the plugin using ```make```
 
