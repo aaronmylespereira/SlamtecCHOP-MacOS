@@ -32,3 +32,11 @@ Updated cpp files for MacOS are placed in the drvlogic folder and have all been 
 4. Run ```cmake ..```
 5. Compile the plugin using ```make```
 
+### Release:
+In the release section, you can download the plugin as a standalone to run in the CPlusPlusCHOP or the RPLiDAR tox to mount it as an engine.
+There are a set of helpful toxes made to help the calibration workflow.
+
+1. RPLiDAR Calibrator is based off the debug file by Ajasra, can send in the CHOP data from the CPP Chop to visualize and align the data in space.
+2. RPLiDAR Reset tox is there to unload the plugin when saving and exiting the patch, this is to mitigate the crash when reopening the file. While saving the script pauses your file for 5 seconds.
+3. RPLiDAR Smoothing uses the cache smoothing method by taking 7 frames of data and a blur to eradicate jittery data. This is done in TOPs rather than a CHOP filter or lag to not mess up the incoming x y information
+
