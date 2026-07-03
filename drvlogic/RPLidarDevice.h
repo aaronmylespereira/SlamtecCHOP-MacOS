@@ -1,7 +1,5 @@
 #pragma once
 #include "common.h"
-#include <atomic>
-#include <chrono>
 #include <vector>
 #include <thread>
 #include <mutex>
@@ -17,7 +15,7 @@ class RPLidarDevice {
         // connect and disconnect
         bool on_connect();
         void on_disconnect();
-        bool thr_connect(bool serial, std::string address_1, int address_2, bool standart, bool udp);
+        bool thr_connect(bool& serial, std::string& port, int& baudrate, bool& standart, bool& udp);
     
         bool check_device_health(int * errorCode = NULL);
         void get_scan_modes();
@@ -28,8 +26,7 @@ class RPLidarDevice {
         void update_status();
         
         std::string get_device_status();
-        [[nodiscard]] bool is_connected() const { return is_connected_.load(); }
-        [[nodiscard]] bool is_busy() const { return is_busy_.load(); }
+        [[nodiscard]] bool is_connected() const { return is_connected_; }
 
         void setMotorSpeed(int speed);
         void setLidar(bool serial, const char* address_1, int address_2, float precision, bool qualityCheck = true, bool standart = false, bool udp = true);
@@ -64,9 +61,9 @@ class RPLidarDevice {
 
         std::string status_msg_;
         
-        std::atomic<bool>  is_connected_{false};
+        bool  is_connected_;
         bool  is_data_ready_;
-        std::atomic<bool>  is_busy_{false};
+        bool  is_busy_;             // for multithreading
 
         IChannel* channel_;
         ILidarDriver * lidar_drv_;
@@ -88,16 +85,12 @@ class RPLidarDevice {
         std::thread _acquisitionThread;
         std::mutex _dataMutex;
         std::condition_variable _dataCondition;
-        std::atomic<bool> _stopAcquisitionThread{false};
-        std::atomic<bool> _connectThreadDone{true};
-        std::atomic<bool> _acquisitionThreadDone{true};
-        std::atomic<bool> _shouldAbortConnect{false};
+        bool _stopAcquisitionThread = false;
         sl_lidar_response_measurement_node_hq_t _sharedNodes[8192]; // Shared buffer
         size_t _sharedCount = 0;
         bool _newDataAvailable = false;
 
         void acquisition_thread_func();
-        static bool timed_join_or_detach(std::thread& t, std::atomic<bool>& done_flag, int timeout_ms);
 
         int _acquisitionDelayMs = 0; // New member for configurable delay
 };

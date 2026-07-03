@@ -63,8 +63,8 @@ constexpr static char DistanceLabel[] = "Distance (m)";
 
 enum class CoordMenuItems
 {
-	Cartesian,
-	Polar
+	Polar, 
+	Cartesian
 };
 
 #pragma endregion

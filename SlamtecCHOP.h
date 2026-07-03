@@ -85,12 +85,6 @@ private:
 	int		num_samples_;
 	int		num_channels_ = 4;
 	int		motor_speed_ = 0;
-
-	// Startup guard: suppress connection for the first N cooks after
-	// construction so that opening a saved project with Active=1 does
-	// not immediately try to connect (which can crash/hang TD).
-	static constexpr int kStartupGuardFrames = 300;
-	bool	startup_guard_active_ = true;
 	double	distance_max_ = 40;
 	double	distance_min_ = 0;
 
