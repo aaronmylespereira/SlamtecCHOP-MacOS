@@ -238,15 +238,15 @@ Parameters::setup(OP_ParameterManager* manager)
 		sp.name = CoordsName;
 		sp.label = CoordsLabel;
 		sp.page = PageOutputName;
-		sp.defaultValue = "Polar";
+		sp.defaultValue = "Cartesian";
 
 		std::array<const char*, 2> Names =
 		{
-			"Polar", "Cartesian"
+			"Cartesian", "Polar"
 		};
 		std::array<const char*, 2> Labels =
 		{
-			"Polar", "Cartesian"
+			"Cartesian", "Polar"
 		};
 		OP_ParAppendResult res = manager->appendMenu(sp, int(Names.size()), Names.data(), Labels.data());
 		

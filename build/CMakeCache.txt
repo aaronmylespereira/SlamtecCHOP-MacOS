@@ -28,7 +28,7 @@ CMAKE_BUILD_TYPE:STRING=
 CMAKE_COLOR_MAKEFILE:BOOL=ON
 
 //CXX compiler
-CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
+CMAKE_CXX_COMPILER:STRING=/usr/bin/c++
 
 //Flags used by the CXX compiler during all build types.
 CMAKE_CXX_FLAGS:STRING=
@@ -46,7 +46,7 @@ CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG
 CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG
 
 //C compiler
-CMAKE_C_COMPILER:FILEPATH=/usr/bin/cc
+CMAKE_C_COMPILER:STRING=/usr/bin/cc
 
 //Flags used by the C compiler during all build types.
 CMAKE_C_FLAGS:STRING=
@@ -152,19 +152,7 @@ CMAKE_PROJECT_HOMEPAGE_URL:STATIC=
 CMAKE_PROJECT_NAME:STATIC=SlamtecCHOP
 
 //Value Computed by CMake
-CMAKE_PROJECT_VERSION:STATIC=
-
-//Value Computed by CMake
-CMAKE_PROJECT_VERSION_MAJOR:STATIC=
-
-//Value Computed by CMake
-CMAKE_PROJECT_VERSION_MINOR:STATIC=
-
-//Value Computed by CMake
-CMAKE_PROJECT_VERSION_PATCH:STATIC=
-
-//Value Computed by CMake
-CMAKE_PROJECT_VERSION_TWEAK:STATIC=
+CMAKE_PROJECT_SPDX_LICENSE:STATIC=
 
 //Path to a program.
 CMAKE_RANLIB:FILEPATH=/usr/bin/ranlib
@@ -257,9 +245,9 @@ CMAKE_CACHEFILE_DIR:INTERNAL=/Users/aaronpereira/RPLiDar/SlamtecCHOP-main/build
 //Major version of cmake used to create the current loaded cache
 CMAKE_CACHE_MAJOR_VERSION:INTERNAL=4
 //Minor version of cmake used to create the current loaded cache
-CMAKE_CACHE_MINOR_VERSION:INTERNAL=1
+CMAKE_CACHE_MINOR_VERSION:INTERNAL=2
 //Patch version of cmake used to create the current loaded cache
-CMAKE_CACHE_PATCH_VERSION:INTERNAL=1
+CMAKE_CACHE_PATCH_VERSION:INTERNAL=3
 //ADVANCED property for variable: CMAKE_COLOR_MAKEFILE
 CMAKE_COLOR_MAKEFILE-ADVANCED:INTERNAL=1
 //Path to CMake executable.

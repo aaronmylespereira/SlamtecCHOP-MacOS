@@ -1,25 +1,40 @@
 #include "RPLidarDevice.h"
 #include <thread>
+#include <cstdio>
+
+static void debug_log(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+
+    FILE* f = fopen("/tmp/slamtec_debug.log", "a");
+    if (f) {
+        va_start(args, fmt);
+        vfprintf(f, fmt, args);
+        va_end(args);
+        fprintf(f, "\n"); // Ensure newline
+        fclose(f);
+    }
+}
 
 static const int baudRateLists[] = {
     115200,
     256000,
+    460800,
     1000000
 };
 
 RPLidarDevice::RPLidarDevice()
 {
-    
     status_msg_ = "RPLidar instance created";
 
-    is_connected_ = false;
-    is_busy_ = false;
     is_data_ready_ = false;
-    
+
     serial_number = "";
     hardware_version = "";
     firmware_version = "";
-    
+
     lidar_drv_ = nullptr;
     channel_ = nullptr;
     precision_ = 2.0f;
@@ -30,14 +45,31 @@ RPLidarDevice::RPLidarDevice()
 
 RPLidarDevice::~RPLidarDevice()
 {
-    status_msg_ = "RPLidar destructor called";
+    debug_log("RPLidarDevice::~RPLidarDevice()");
     on_disconnect();
+}
+
+bool RPLidarDevice::timed_join_or_detach(std::thread& t, std::atomic<bool>& done_flag, int timeout_ms)
+{
+    if (!t.joinable()) return true;
+
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+    while (!done_flag.load(std::memory_order_acquire)) {
+        if (std::chrono::steady_clock::now() >= deadline) {
+            debug_log("RPLidarDevice: thread did not finish within %dms, detaching", timeout_ms);
+            t.detach();
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    t.join();
+    return true;
 }
 
 void
 RPLidarDevice::setLidar(bool serial, const char* address_1, int address_2, float precision, bool qualityCheck, bool standart, bool udp)
 {
-    if (is_busy_)
+    if (is_busy_.load())
     {
         // check if it in connection now, then just do nothing
         status_msg_ = "RPLidar is busy";
@@ -56,8 +88,9 @@ RPLidarDevice::setLidar(bool serial, const char* address_1, int address_2, float
 }
 
 bool
-RPLidarDevice::thr_connect(bool& serial, std::string& address_1, int& address_2, bool& standart, bool &udp)
+RPLidarDevice::thr_connect(bool serial, std::string address_1, int address_2, bool standart, bool udp)
 {
+    _connectThreadDone.store(false);
     sl_result ans;
 
     if(serial)
@@ -70,27 +103,39 @@ RPLidarDevice::thr_connect(bool& serial, std::string& address_1, int& address_2,
             channel_ = *createTcpChannel(address_1, address_2);
     }
 
+    if (_shouldAbortConnect.load()) { is_busy_.store(false); _connectThreadDone.store(true); return false; }
+
     if (!lidar_drv_)
         lidar_drv_ = *createLidarDriver();
 
     if (!(bool)lidar_drv_)
     {
-        is_busy_ = false;
-        return SL_RESULT_OPERATION_FAIL == 1;
-    }
-    
-    ans =(lidar_drv_)->connect(channel_);
-
-    if (SL_IS_FAIL(ans)) {
-        status_msg_ = "Error, cannot bind to the specified address: " + _address_1;
-        is_busy_ = false;
+        is_busy_.store(false);
+        _connectThreadDone.store(true);
         return false;
     }
-    
+
+    if (_shouldAbortConnect.load()) { is_busy_.store(false); _connectThreadDone.store(true); return false; }
+
+    // This connect() call has NO timeout in the SDK and can block indefinitely
+    ans = (lidar_drv_)->connect(channel_);
+
+    if (_shouldAbortConnect.load()) { is_busy_.store(false); _connectThreadDone.store(true); return false; }
+
+    if (SL_IS_FAIL(ans)) {
+        status_msg_ = "Error, cannot bind to the specified address: " + address_1;
+        is_busy_.store(false);
+        _connectThreadDone.store(true);
+        return false;
+    }
+
+    if (_shouldAbortConnect.load()) { is_busy_.store(false); _connectThreadDone.store(true); return false; }
+
     ans = lidar_drv_->getDeviceInfo(devinfo_);
     if (SL_IS_FAIL(ans)) {
         status_msg_ = "Failed to get device info. code: " + std::to_string(ans);
-        is_busy_ = false;
+        is_busy_.store(false);
+        _connectThreadDone.store(true);
         return false;
     }
     ans = lidar_drv_->getMotorInfo(motorinfo_);
@@ -99,48 +144,46 @@ RPLidarDevice::thr_connect(bool& serial, std::string& address_1, int& address_2,
 
     if(!check_device_health())
     {
-        is_busy_ = false;
+        is_busy_.store(false);
+        _connectThreadDone.store(true);
         return false;
     }
-    
+
+    if (_shouldAbortConnect.load()) { is_busy_.store(false); _connectThreadDone.store(true); return false; }
+
     get_scan_modes();
 
     if(serial)
         lidar_drv_->setMotorSpeed(0);
-    
+
     if(standart)
         lidar_drv_->startScanExpress(0,0,0,&currentScanMode);
     else
         lidar_drv_->startScan(0,1, 0, &currentScanMode);
 
-    is_connected_ = true;
-    status_msg_ = "Connected to RPLidar on " + _address_1;
-    is_busy_ = false;
+    is_connected_.store(true);
+    status_msg_ = "Connected to RPLidar on " + address_1;
 
-    // wait for data to be ready
-    sl_lidar_response_measurement_node_hq_t nodes[8192];
-    size_t   count = _countof(nodes);
-    while(!is_data_ready_)
-    {
-        op_result_ = lidar_drv_->grabScanDataHq(nodes, count, 1000);
-        if (SL_IS_OK(op_result_) && count > 0)
-        {
-            is_data_ready_ = true;
-        }
-    }
+    // Start acquisition thread
+    _stopAcquisitionThread.store(false);
+    _acquisitionThread = std::thread(&RPLidarDevice::acquisition_thread_func, this);
 
-    return false;
+    is_busy_.store(false);
+    _connectThreadDone.store(true);
+
+    return true;
 }
 
 void RPLidarDevice::acquisition_thread_func()
 {
+    _acquisitionThreadDone.store(false);
     sl_lidar_response_measurement_node_hq_t nodes[8192];
     size_t count = _countof(nodes);
 
-    while (!_stopAcquisitionThread)
+    while (!_stopAcquisitionThread.load())
     {
         // Acquire data from lidar
-        sl_result result = lidar_drv_->grabScanDataHq(nodes, count, 1000);
+        sl_result result = lidar_drv_->grabScanDataHq(nodes, count, 100); // Reduced timeout to 100ms
 
         if (SL_IS_OK(result) && count > 0)
         {
@@ -158,18 +201,33 @@ void RPLidarDevice::acquisition_thread_func()
         }
         else
         {
-            // Handle error or no data case, maybe sleep for a bit to avoid busy-waiting
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            // If timeout or error, just continue to check _stopAcquisitionThread
+             if (result != SL_RESULT_OPERATION_TIMEOUT) {
+                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
+             }
         }
         count = _countof(nodes); // Reset count for next grabScanDataHq call
     }
+    _acquisitionThreadDone.store(true);
 }
 
 bool
 RPLidarDevice::on_connect()
 {
-    printf("RPLidarDevice::on_connect()\n");
-    if (is_connected_ || is_busy_) return true;
+    debug_log("RPLidarDevice::on_connect()");
+    if (is_connected_.load() || is_busy_.load()) return true;
+
+    // Join previous thread only if it has finished — never block the main thread
+    if (_lidarThread.joinable()) {
+        if (!_connectThreadDone.load()) {
+            debug_log("RPLidarDevice::on_connect() - previous thread still running, skipping");
+            return false;
+        }
+        _lidarThread.join();
+    }
+
+    _shouldAbortConnect.store(false);
+
     if(_channelTypeSerial)
     {
         status_msg_ = "Connecting to RPLidar on PORT: " + _address_1 + " BAUDRATE: " + std::to_string(_address_2);
@@ -177,45 +235,64 @@ RPLidarDevice::on_connect()
     {
         status_msg_ = "Connecting to RPLidar TCP on IP: " + std::string(_address_1) + " PORT: " + std::to_string(_address_2);
     }
-    
 
-    is_busy_ = true;
-    _lidarThread = std::thread([this] {this->thr_connect(_channelTypeSerial, _address_1, _address_2, _standart, _udp);});
-    _lidarThread.join(); // Wait for thr_connect to finish initialization
 
-    if (is_connected_) { // Only start acquisition thread if connection was successful
-        _stopAcquisitionThread = false;
-        _acquisitionThread = std::thread(&RPLidarDevice::acquisition_thread_func, this);
-    }
-    
-    return is_connected_; // Return actual connection status
+    is_busy_.store(true);
+    // Capture connection parameters by value so the thread owns its own copies.
+    // This prevents dangling references if the object is destroyed while the
+    // thread is still running (detach fallback in on_disconnect).
+    _lidarThread = std::thread([this, serial=_channelTypeSerial, addr1=_address_1,
+                                addr2=_address_2, standart=_standart, udp=_udp] {
+        this->thr_connect(serial, addr1, addr2, standart, udp);
+    });
+
+    return false;
 }
 
 void
 RPLidarDevice::on_disconnect()
 {
-    // Signal acquisition thread to stop and join it
-    _stopAcquisitionThread = true;
-    if (_acquisitionThread.joinable()) {
-        _acquisitionThread.join();
-    }
+    debug_log("RPLidarDevice::on_disconnect() called");
+    
+    // Signal both threads to stop
+    _shouldAbortConnect.store(true);
+    _stopAcquisitionThread.store(true);
 
-    if (is_connected_ && lidar_drv_) {
+    // Use timed join for connection thread (500ms timeout)
+    bool lidarThreadTerminated = timed_join_or_detach(_lidarThread, _connectThreadDone, 500);
+
+    // Use timed join for acquisition thread (500ms timeout)
+    bool acquisitionThreadTerminated = timed_join_or_detach(_acquisitionThread, _acquisitionThreadDone, 500);
+
+    if (is_connected_ && lidar_drv_ && lidarThreadTerminated && acquisitionThreadTerminated) {
         lidar_drv_->stop();
         if(_channelTypeSerial) lidar_drv_->setMotorSpeed(0);
     }
+    
     is_connected_ = false;
     is_data_ready_ = false;
-    if (lidar_drv_)
-    {
-        delete lidar_drv_;
+
+    // Only delete if threads have finished, otherwise we leak the memory to avoid an access violation/crash 
+    // from the detached thread if it ever wakes up.
+    if (lidarThreadTerminated && acquisitionThreadTerminated) {
+        if (lidar_drv_)
+        {
+            delete lidar_drv_;
+            lidar_drv_ = nullptr;
+        }
+        if (channel_)
+        {
+            delete channel_;
+            channel_ = nullptr;
+        }
+    } else {
+        debug_log("RPLidarDevice::on_disconnect() - threads did not terminate, leaking objects to avoid crash");
+        // Null out pointers so we don't try to use these specific instances again,
+        // but the detached threads still have access to the original memory if they wake up.
         lidar_drv_ = nullptr;
-    }
-    if (channel_)
-    {
-        delete channel_;
         channel_ = nullptr;
     }
+    
     init_data();
 }
 

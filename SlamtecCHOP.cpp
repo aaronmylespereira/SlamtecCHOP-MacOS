@@ -86,10 +86,8 @@ SlamtecCHOP::SlamtecCHOP(const OP_NodeInfo*)
 SlamtecCHOP::~SlamtecCHOP()
 {
 	debug_info("Destructor called");
-	if(lidar->is_connected())
-	{
-		lidar->on_disconnect();
-	}
+	delete lidar;
+	lidar = nullptr;
 }
 
 void
@@ -150,6 +148,9 @@ SlamtecCHOP::execute(CHOP_Output* output,
 							  const OP_Inputs* inputs,
 							  void*)
 {
+	if (my_execute_count_ % 60 == 0) { // Log once per second approx
+		// debug_info("execute called");
+	}
 	my_execute_count_++;
 
 	// update parameters
@@ -180,7 +181,16 @@ SlamtecCHOP::execute(CHOP_Output* output,
 		inputs->enablePar(BaudrateName, !is_network_);
 	}
 	
-	if (is_active_ && !lidar->is_connected())
+	// Startup guard: skip connection attempts for the first N cooks after
+	// construction. This prevents auto-connecting when a saved project is
+	// opened with Active=1, which would crash/hang TD.
+	if (startup_guard_active_)
+	{
+		if (my_execute_count_ >= kStartupGuardFrames)
+			startup_guard_active_ = false;
+	}
+
+	if (is_active_ && !lidar->is_connected() && !startup_guard_active_)
 	{
 		num_samples_ = static_cast<int>(precision_) * 360;
 
@@ -263,6 +273,7 @@ SlamtecCHOP::init()
 	my_execute_count_ = 0;
 	num_samples_ = 360 * static_cast<int>(precision_);
 	is_was_active_ = false;
+	startup_guard_active_ = true;
 	lidar = new RPLidarDevice();
 }
 
@@ -441,5 +452,10 @@ SlamtecCHOP::debug_info(const char* message)
 	combined += message;
 	combined += "\n";
 	printf(combined.c_str());
-	
+
+	FILE* f = fopen("/tmp/slamtec_debug.log", "a");
+	if (f) {
+		fprintf(f, "%s", combined.c_str());
+		fclose(f);
+	}
 }

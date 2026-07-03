@@ -1,42 +1,28 @@
-# TouchDesigner Slamtec Lidar support for MacOS
-
-This is a fork of Ajasra (Vasily’s) Slamtec Lidar CPlusPlus CHOP for TouchDesigner. This plugin was built with Gemini-CLI by editing and rebuilding the original project files. I have no idea how it was built, I just kept prompting it and the plugin crashing TouchDesigner till it finally worked.
+# TouchDesigner Slamtec Lidar support
+CPlusPlus CHOP for TouchDesigner to read data from Slamtec Lidar.
+Please check the Dubug folder or [release](https://github.com/Ajasra/SlamtecCHOP/releases) for example.
 
 ### Supported:
-RPLIDAR A1 / A2 / A3 / S1 / S2 / S3 BUT tested with only an A1M8 on an M1 Pro and M3 Max with MacOS Sequoia 
+RPLIDAR A1 / A2 / A3 / S1 / S2 / S3
 
-### Quarantine:
-Since this app was not built on your machine it might not load into TouchDesigner, this can be fixed by removing the quarantine attribute associated with the plugin, below are the steps.
-
-1. Locate the plugin in the downloaded folder
-2. Open up a terminal window
-3. Type in ```xattr -d com.apple.quarantine ```
-4. Drag and drop the plugin into the terminal window, and click enter
-5. Your plugin should now load in TouchDesigner
-
-### Setup:
-1. Please make sure CP210x drivers are installed from [here](https://www.silabs.com/software-and-tools/usb-to-uart-bridge-vcp-drivers?tab=downloads)
-2. Restart your machine for drivers to take effect
-3. Find the name of your port by running ```ls /dev/tty.*``` in the terminal
-4. Paste the name of the port in the CHOP and set the correct baudrate for your model
-5. Click Active, if the plugin doesn’t load click Re-init
-
+For the setup check your COM port in the Windows manager and set up the baud rate to match your lidar model.
 You can add the infoDAT to see lidar information.
 
-### Compiling:
-Updated cpp files for MacOS are placed in the drvlogic folder and have all been edited and built by Gemini-CLI.
+### Compiling
+1. Clone this repository
+2. Clone the [rplidar sdk](https://github.com/Slamtec/rplidar_sdk)
+3. Open in Visual Studio 2019
+4. Add the rplidar SDK to the project
+5. Follow [this steps](https://github.com/Slamtec/rplidar_sdk/issues/71#issuecomment-1382005055) to setup right linking
+6. Build
 
-1. cd to the main directory of the folder
-2. Clone the original [rplidar-sdk](https://github.com/Slamtec/rplidar_sdk)
-3. Make a new build directory by ```mkdir build``` and ```cd build```
-4. Run ```cmake ..```
-5. Compile the plugin using ```make```
+#### TODO:
+- [x] Support for all serial baudrates
+- [x] Receive lidar information and available modes
+- [x] Support for the network models over TCP/UDP
+- [x] Settings for the lidar (change mode, change motor speed, etc)
+- [ ] Add C1 support (need to test)
+- [ ] 2.1.0 SDK crash project now, need to check
+- [ ] V4 version rolled back as was reported doesn't works sometime, V3 release the stable one.
 
-### Release:
-In the release section, you can download the plugin as a standalone to run in the CPlusPlusCHOP or the RPLiDAR tox to mount it as an engine.
-There are a set of helpful toxes made to help the calibration workflow.
-
-1. RPLiDAR Calibrator is based off the debug file by Ajasra, can send in the CHOP data from the CPP Chop to visualize and align the data in space.
-2. RPLiDAR Reset tox is there to unload the plugin when saving and exiting the patch, this is to mitigate the crash when reopening the file. While saving the script pauses your file for 5 seconds.
-3. RPLiDAR Smoothing uses the cache smoothing method by taking 7 frames of data and a blur to eradicate jittery data. This is done in TOPs rather than a CHOP filter or lag to not mess up the incoming x y information
-
+Did you find it useful? - support by [buying me a book](https://www.buymeacoffee.com/vasilyonl)

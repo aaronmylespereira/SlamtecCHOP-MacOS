@@ -2,12 +2,12 @@
 
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++11 -arch x86_64 -O2 -Wall -shared -fPIC
+CXXFLAGS = -std=c++14 -arch arm64 -O2 -Wall -shared -fPIC
 LDFLAGS = -Wl,-all_load
-MACOS_FLAGS = -mmacosx-version-min=10.9 -framework CoreFoundation -framework AppKit
+MACOS_FLAGS = -mmacosx-version-min=11.0 -framework CoreFoundation -framework AppKit
 
 # Directories
-RPLIDAR_SDK_PATH = /Users/aaronpereira/RPLiDar/rplidar_sdk-release-v1.12.0/sdk
+RPLIDAR_SDK_PATH = /Users/aaronpereira/RPLiDar/rplidar_ros-2.1.5
 PLUGIN_NAME = Slamtec
 
 # Source files
@@ -29,13 +29,14 @@ LIB_PATHS = -L$(RPLIDAR_SDK_PATH)/output/Darwin/Release
 LIBS = -lrplidar_sdk
 
 # Target
-TARGET = $(PLUGIN_NAME).plugin/$(PLUGIN_NAME)
+TARGET = $(PLUGIN_NAME).plugin/Contents/MacOS/$(PLUGIN_NAME)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	@mkdir -p $(PLUGIN_NAME).plugin
+	@mkdir -p $(PLUGIN_NAME).plugin/Contents/MacOS
 	$(CXX) $(CXXFLAGS) $(MACOS_FLAGS) -o $@ $(OBJS) $(LIB_PATHS) $(LIBS) $(LDFLAGS)
+	@cp plugin/Slamtec.plugin/Contents/Info.plist $(PLUGIN_NAME).plugin/Contents/ 2>/dev/null || true
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
